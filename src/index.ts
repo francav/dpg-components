@@ -4,10 +4,13 @@
 /**
  * @dpg/components — L3 component layer.
  *
- * This entrypoint currently exposes the framework-neutral view-model: the
- * adapter that maps compiler output onto the renderable {@link AnalysisResult}
- * shape, plus its types and presentation constants. The custom-element layer is
- * added in a later work unit and renders this view-model.
+ * Exposes two layers:
+ *  - the framework-neutral view-model: the adapter that maps compiler output
+ *    onto the renderable {@link AnalysisResult} shape, plus its types and
+ *    presentation constants; and
+ *  - the custom-element layer: framework-neutral Web Components that render that
+ *    view-model (`defineDpgElements()` registers them).
  */
 
 export * from "./view-model/index.js";
+export * from "./components/index.js";

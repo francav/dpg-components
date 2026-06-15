@@ -27,9 +27,14 @@
   "devDependencies": {
     "@eslint/js": "^9",
     "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
     "eslint": "^9",
     "globals": "^16",
+    "jsdom": "^25",
     "prettier": "^3",
+    "react": "^19",
+    "react-dom": "^19",
     "typescript": "^5.9",
     "typescript-eslint": "^8",
     "vitest": "^3"
