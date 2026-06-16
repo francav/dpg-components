@@ -39,6 +39,8 @@ describe("axis rows", () => {
       "fullyDeterministic",
       "policyDependent",
       "runtimeBound",
+      "nonDeterministic",
+      "unknown",
     ]);
     expect(AXIS_X_ROWS.map((r) => r.key)).toEqual([
       "selfContained",

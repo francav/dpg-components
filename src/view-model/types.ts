@@ -12,8 +12,20 @@
 
 // ── Axis classifications (view-model vocabulary) ──────────────────────────────
 
-/** Axis Y — behavioral determinism, collapsed to the three rendered rows. */
-export type AxisYClassification = "fullyDeterministic" | "policyDependent" | "runtimeBound";
+/**
+ * Axis Y — behavioral determinism. Five rendered classes that map 1:1 from the
+ * compiler's principled classification (WU-F.2): `fullyDeterministic`,
+ * `policyDependent`, `runtimeBound`, `nonDeterministic`, `unknown`. The view-model
+ * no longer collapses `nonDeterministic`/`unknown` into `runtimeBound`, so a human
+ * task (nonDeterministic) and a callActivity/subProcess (unknown) render as their
+ * own distinct classes.
+ */
+export type AxisYClassification =
+  | "fullyDeterministic"
+  | "policyDependent"
+  | "runtimeBound"
+  | "nonDeterministic"
+  | "unknown";
 
 /** Axis X — runtime coupling, collapsed to the four rendered rows. */
 export type AxisXClassification =
@@ -78,6 +90,8 @@ export interface AxisYCounts {
   fullyDeterministic: number;
   policyDependent: number;
   runtimeBound: number;
+  nonDeterministic: number;
+  unknown: number;
 }
 
 export interface AxisXCounts {

@@ -199,7 +199,7 @@ describe("mapCompilerResult", () => {
     expect(result.findings[0]!.id).toBe("finding-s0");
   });
 
-  it("collapses the compiler axis vocabulary to the rendered rows", () => {
+  it("maps the compiler axis-Y vocabulary 1:1 to the five rendered classes", () => {
     const result = mapCompilerResult(
       baseResult({
         determinismMap: [
@@ -222,14 +222,15 @@ describe("mapCompilerResult", () => {
             axisX: "engineSpecific",
             policyClause: "p3",
           },
-          // nonDeterministic → worst-case runtimeBound; unknown axisX → selfContained.
+          // nonDeterministic stays its OWN class (NOT collapsed to runtimeBound);
+          // unknown axisX → selfContained.
           {
             evaluationPointId: "D",
             axisY: "nonDeterministic",
             axisX: "unknown",
             policyClause: "p4",
           },
-          // externalized → externalCoupled.
+          // unknown axisY stays its OWN class; externalized → externalCoupled.
           {
             evaluationPointId: "E",
             axisY: "unknown",
@@ -249,17 +250,24 @@ describe("mapCompilerResult", () => {
       "Policy: p2 · Profile: camunda-7.serviceTask",
     );
     expect(result.determinismMap["C"]!.axisY).toBe("runtimeBound");
+    // The F.2 fidelity assertions: nonDeterministic / unknown are NOT runtimeBound.
     expect(result.determinismMap["D"]).toMatchObject({
-      axisY: "runtimeBound",
+      axisY: "nonDeterministic",
       axisX: "selfContained",
     });
-    expect(result.determinismMap["E"]!.axisX).toBe("externalCoupled");
+    expect(result.determinismMap["D"]!.axisY).not.toBe("runtimeBound");
+    expect(result.determinismMap["E"]).toMatchObject({
+      axisY: "unknown",
+      axisX: "externalCoupled",
+    });
+    expect(result.determinismMap["E"]!.axisY).not.toBe("runtimeBound");
 
     expect(result.matrix.axisY).toEqual({
       fullyDeterministic: 1,
       policyDependent: 1,
-      // C runtimeBound + D nonDeterministic + E unknown → all worst-case.
-      runtimeBound: 3,
+      runtimeBound: 1,
+      nonDeterministic: 1,
+      unknown: 1,
     });
     expect(result.matrix.axisX).toEqual({
       selfContained: 2,

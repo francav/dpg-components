@@ -35,11 +35,14 @@ import type {
 // ── Axis mappings ─────────────────────────────────────────────────────────────
 
 function mapAxisY(y: CompilerAxisY): AxisYClassification {
+  // 1:1 with the compiler's principled classes (WU-F.2): the only rename is
+  // `deterministic` → `fullyDeterministic`. nonDeterministic/unknown are surfaced
+  // as their own distinct view-model classes, NOT collapsed into runtimeBound.
   if (y === "deterministic") return "fullyDeterministic";
   if (y === "policyDependent") return "policyDependent";
   if (y === "runtimeBound") return "runtimeBound";
-  // nonDeterministic / unknown — treat as worst-case
-  return "runtimeBound";
+  if (y === "nonDeterministic") return "nonDeterministic";
+  return "unknown";
 }
 
 function mapAxisX(x: CompilerAxisX): AxisXClassification {
@@ -254,6 +257,8 @@ export function mapCompilerResult(
     fullyDeterministic: 0,
     policyDependent: 0,
     runtimeBound: 0,
+    nonDeterministic: 0,
+    unknown: 0,
   };
   const axisX: AxisXCounts = {
     selfContained: 0,

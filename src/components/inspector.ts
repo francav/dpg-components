@@ -69,6 +69,8 @@ const AXIS_Y_ORDER: ReadonlyArray<AxisYClassification> = [
   "fullyDeterministic",
   "policyDependent",
   "runtimeBound",
+  "nonDeterministic",
+  "unknown",
 ];
 const AXIS_X_ORDER: ReadonlyArray<AxisXClassification> = [
   "selfContained",

@@ -32,11 +32,14 @@ const AXIS_X_COL: Record<AxisXClassification, number> = {
   selfContained: 3,
 };
 
-// Axis Y rows top→bottom: best determinism first.
+// Axis Y rows top→bottom: best determinism first, worst last (nonDeterministic),
+// with the neutral "unknown" class as the final row.
 const AXIS_Y_ROW: Record<AxisYClassification, number> = {
   fullyDeterministic: 0,
   policyDependent: 1,
   runtimeBound: 2,
+  nonDeterministic: 3,
+  unknown: 4,
 };
 
 const AXIS_X_ORDER: AxisXClassification[] = [
@@ -49,10 +52,12 @@ const AXIS_Y_ORDER: AxisYClassification[] = [
   "fullyDeterministic",
   "policyDependent",
   "runtimeBound",
+  "nonDeterministic",
+  "unknown",
 ];
 
 const COLS = 4;
-const ROWS = 3;
+const ROWS = AXIS_Y_ORDER.length;
 const PAD_LEFT = 15;
 const PAD_BOTTOM = 18;
 const PLOT_W = 100 - PAD_LEFT;
@@ -178,11 +183,33 @@ export class DpgGovernanceMatrix extends DpgElement {
     const gw = PLOT_W;
     const gh = PLOT_H;
 
-    // Risk-tinted cells: top-right best, bottom-left worst.
+    // Risk-tinted cells: green (best) → red (worst). Determinism risk is keyed
+    // per row rather than by raw row index so the neutral "unknown" class (last
+    // row) reads as moderate/grey rather than the reddest band, while the true
+    // worst class (nonDeterministic) is the most saturated.
+    const Y_RISK: number[] = AXIS_Y_ORDER.map((key) =>
+      key === "fullyDeterministic"
+        ? 0
+        : key === "policyDependent"
+          ? 1
+          : key === "runtimeBound"
+            ? 2
+            : key === "nonDeterministic"
+              ? 3
+              : /* unknown */ 1,
+    );
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
-        const risk = row + (COLS - 1 - col);
-        const fill = risk <= 1 ? "#10b981" : risk <= 3 ? "#f59e0b" : "#ef4444";
+        const yRisk = Y_RISK[row] ?? 0;
+        const risk = yRisk + (COLS - 1 - col);
+        const isUnknown = AXIS_Y_ORDER[row] === "unknown";
+        const fill = isUnknown
+          ? "#9ca3af"
+          : risk <= 1
+            ? "#10b981"
+            : risk <= 3
+              ? "#f59e0b"
+              : "#ef4444";
         root.append(
           svg("rect", {
             x: gx + (col / COLS) * gw,

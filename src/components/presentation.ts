@@ -50,6 +50,22 @@ export const AXIS_Y_INFO: Record<AxisYClassification, AxisYInfo> = {
     score: 30,
     riskLevel: "High",
   },
+  nonDeterministic: {
+    label: "Non-Deterministic",
+    short: "Non-Det.",
+    color: "#7f1d1d",
+    description: "Same input can yield different outputs (e.g. a human task).",
+    score: 10,
+    riskLevel: "Critical",
+  },
+  unknown: {
+    label: "Unknown",
+    short: "Unknown",
+    color: "#6b7280",
+    description: "Determinism could not be established (e.g. a call activity).",
+    score: 25,
+    riskLevel: "Unknown",
+  },
 };
 
 export interface AxisXInfo {

@@ -17,7 +17,7 @@ import {
   mountGovernancePanels,
 } from "./index.js";
 import type { ElementSelectDetail, SelectionChangeDetail } from "./index.js";
-import { sampleAnalysis } from "./test-fixtures.js";
+import { fiveClassAnalysis, sampleAnalysis } from "./test-fixtures.js";
 
 beforeAll(() => {
   defineDpgElements();
@@ -79,6 +79,33 @@ describe("<dpg-governance-matrix>", () => {
     dot?.click();
     expect(selected).toBe(dot?.getAttribute("data-element-id"));
     expect(selected).not.toBeNull();
+    el.remove();
+  });
+
+  it("renders the five distinct Axis-Y rows in the legend (F.2 fidelity)", () => {
+    const el = document.createElement(DpgGovernanceMatrix.tagName) as DpgGovernanceMatrix;
+    document.body.append(el);
+    el.result = fiveClassAnalysis();
+
+    // One dot per element across all five Axis-Y classes.
+    expect(el.shadowRoot?.querySelectorAll(".matrix__dot").length).toBe(5);
+    const text = el.shadowRoot?.textContent ?? "";
+    // The legend carries the two new classes as their own (short) labels.
+    expect(text).toContain("Non-Det.");
+    expect(text).toContain("Unknown");
+    el.remove();
+  });
+
+  it("plots the human task (nonDeterministic) and call activity (unknown) on their own rows", () => {
+    const el = document.createElement(DpgGovernanceMatrix.tagName) as DpgGovernanceMatrix;
+    document.body.append(el);
+    el.result = fiveClassAnalysis();
+
+    const dotFor = (id: string) =>
+      el.shadowRoot?.querySelector<HTMLButtonElement>(`.matrix__dot[data-element-id="${id}"]`);
+    // The aria-label carries the real class — not "runtimeBound".
+    expect(dotFor("UserTask_Review")?.getAttribute("aria-label")).toContain("nonDeterministic");
+    expect(dotFor("CallActivity_Sub")?.getAttribute("aria-label")).toContain("unknown");
     el.remove();
   });
 });
@@ -424,16 +451,59 @@ describe("<dpg-governance-inspector>", () => {
 
   it("axis-class bars show per-class element counts from result.matrix", () => {
     const el = mountInspector();
-    // The fixture has one element per Axis-Y class and three of the four Axis-X
-    // classes (selfContained = 0) → 3 Y bars + 4 X bars.
+    // All five Axis-Y rows + all four Axis-X rows always render (5 + 4 = 9),
+    // even classes with zero elements (so the user sees the empty rows).
     const bars = axisBars(el);
-    expect(bars.length).toBe(7);
-    // Each Axis-Y class has exactly one element.
+    expect(bars.length).toBe(9);
+    // Each populated Axis-Y class has exactly one element.
     const det = bars.find((b) => b.textContent?.includes("Fully Deterministic"));
     expect(det?.querySelector(".axisbar__count")?.textContent).toBe("1");
     // selfContained has zero elements.
     const self = bars.find((b) => b.textContent?.includes("Self-Contained"));
     expect(self?.querySelector(".axisbar__count")?.textContent).toBe("0");
+    el.remove();
+  });
+
+  it("surfaces the Non-Deterministic + Unknown Axis-Y bars with live counts (F.2 fidelity)", () => {
+    const el = document.createElement(DpgGovernanceInspector.tagName) as DpgGovernanceInspector;
+    document.body.append(el);
+    el.result = fiveClassAnalysis();
+    const bars = axisBars(el);
+
+    const nonDet = bars.find((b) => b.textContent?.includes("Non-Deterministic"));
+    const unknown = bars.find((b) => b.textContent?.includes("Unknown"));
+    expect(nonDet).toBeTruthy();
+    expect(unknown).toBeTruthy();
+    expect(nonDet?.querySelector(".axisbar__count")?.textContent).toBe("1");
+    expect(unknown?.querySelector(".axisbar__count")?.textContent).toBe("1");
+    el.remove();
+  });
+
+  it("filtering by the Non-Deterministic bar narrows findings to the human task", () => {
+    const el = document.createElement(DpgGovernanceInspector.tagName) as DpgGovernanceInspector;
+    document.body.append(el);
+    el.result = fiveClassAnalysis();
+    expect(findingCount(el)).toBe(1);
+
+    axisBars(el)
+      .find((b) => b.textContent?.includes("Non-Deterministic"))!
+      .click();
+    // The lone warning belongs to UserTask_Review (nonDeterministic).
+    expect(findingCount(el)).toBe(1);
+    expect(el.shadowRoot?.querySelector(".chip")?.textContent).toContain("Non-Deterministic");
+    el.remove();
+  });
+
+  it("element drill-down shows the real Unknown class label, not Runtime-Bound", () => {
+    const el = document.createElement(DpgGovernanceInspector.tagName) as DpgGovernanceInspector;
+    document.body.append(el);
+    el.result = fiveClassAnalysis();
+    el.selectedElementId = "CallActivity_Sub";
+
+    const text =
+      el.shadowRoot?.querySelector("dpg-element-provenance")?.shadowRoot?.textContent ?? "";
+    expect(text).toContain("Unknown");
+    expect(text).not.toContain("Runtime-Bound");
     el.remove();
   });
 

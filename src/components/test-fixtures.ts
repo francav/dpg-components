@@ -91,3 +91,68 @@ export const SAMPLE_COMPILER_RESULT: CompilerResultInput = {
 export function sampleAnalysis(): AnalysisResult {
   return mapCompilerResult(SAMPLE_COMPILER_RESULT);
 }
+
+/**
+ * A compiler result that exercises all five Axis-Y classes — including the two
+ * the view-model surfaces distinctly after the F.2 fidelity fix: a human task
+ * (`nonDeterministic`) and a call activity (`unknown`). Used by the matrix /
+ * inspector tests to assert the new rows/bars render with the real labels and
+ * are NOT collapsed into Runtime-Bound.
+ */
+export const FIVE_CLASS_COMPILER_RESULT: CompilerResultInput = {
+  metadata: { modelId: "five-class", degraded: false },
+  structuralFindings: [],
+  semanticFindings: [
+    {
+      id: "H1",
+      category: "semantic",
+      severity: "warning",
+      message: "Human task outcome is operator-decided.",
+      ruleId: "SEM_HUMAN_TASK",
+      targetId: "UserTask_Review",
+    },
+  ],
+  determinismMap: [
+    {
+      evaluationPointId: "Task_Calc",
+      axisY: "deterministic",
+      axisX: "engineAgnostic",
+      policyClause: "p#det",
+    },
+    {
+      evaluationPointId: "Gateway_Branch",
+      axisY: "policyDependent",
+      axisX: "profileScoped",
+      policyClause: "p#policy",
+    },
+    {
+      evaluationPointId: "Gateway_Runtime",
+      axisY: "runtimeBound",
+      axisX: "engineSpecific",
+      policyClause: "p#runtime",
+    },
+    {
+      evaluationPointId: "UserTask_Review",
+      axisY: "nonDeterministic",
+      axisX: "engineAgnostic",
+      policyClause: "p#human",
+    },
+    {
+      evaluationPointId: "CallActivity_Sub",
+      axisY: "unknown",
+      axisX: "externalized",
+      policyClause: "p#sub",
+    },
+  ],
+  runtimeDependencyMap: [],
+  summary: {
+    structuralErrors: 0,
+    semanticErrors: 0,
+    contractCoverageRatio: 1,
+  },
+};
+
+/** Analysis view-model spanning all five Axis-Y classes. */
+export function fiveClassAnalysis(): AnalysisResult {
+  return mapCompilerResult(FIVE_CLASS_COMPILER_RESULT);
+}

@@ -29,6 +29,8 @@ export const AXIS_Y_ROWS: ReadonlyArray<AxisRow<AxisYClassification>> = [
   { key: "fullyDeterministic", label: "FD", color: "#22c55e" },
   { key: "policyDependent", label: "PD", color: "#eab308" },
   { key: "runtimeBound", label: "RB", color: "#f97316" },
+  { key: "nonDeterministic", label: "ND", color: "#7f1d1d" },
+  { key: "unknown", label: "UN", color: "#6b7280" },
 ] as const;
 
 export const AXIS_X_ROWS: ReadonlyArray<AxisRow<AxisXClassification>> = [

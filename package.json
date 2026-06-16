@@ -1,6 +1,6 @@
 {
   "name": "@francav/components",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "DPG L3 governance Web Components: framework-neutral custom elements that render BPMN/DMN determinism analysis",
   "license": "Apache-2.0",
   "author": "Victor França",
