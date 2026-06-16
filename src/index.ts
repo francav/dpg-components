@@ -2,7 +2,15 @@
 // Copyright 2026 Victor França
 
 /**
- * Placeholder export proving the @dpg/components toolchain builds.
- * Replaced with real Web Component exports in a later work unit.
+ * @dpg/components — L3 component layer.
+ *
+ * Exposes two layers:
+ *  - the framework-neutral view-model: the adapter that maps compiler output
+ *    onto the renderable {@link AnalysisResult} shape, plus its types and
+ *    presentation constants; and
+ *  - the custom-element layer: framework-neutral Web Components that render that
+ *    view-model (`defineDpgElements()` registers them).
  */
-export const greet = (name: string): string => `Hello ${name} from @dpg/components`;
+
+export * from "./view-model/index.js";
+export * from "./components/index.js";
