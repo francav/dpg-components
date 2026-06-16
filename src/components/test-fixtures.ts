@@ -77,15 +77,17 @@ export const SAMPLE_COMPILER_RESULT: CompilerResultInput = {
     structuralErrors: 1,
     semanticErrors: 0,
     contractCoverageRatio: 0.5,
+    // Real compiler maturity signal → the adapter derives score 64 ("fair")
+    // from a 60/40 determinism/portability blend (60*0.6 + 70*0.4 = 64).
+    maturitySignal: { deterministicTotal: 60, portableTotal: 70, totalEvaluationPoints: 3 },
   },
 };
 
-/** Build the sample analysis view-model, with summary score/signal filled in. */
+/**
+ * Build the sample analysis view-model. The adapter now derives score 64 /
+ * "fair" from the fixture's real `summary.maturitySignal`, so no host override
+ * is needed (this exercises the real maturity/score passthrough end-to-end).
+ */
 export function sampleAnalysis(): AnalysisResult {
-  const result = mapCompilerResult(SAMPLE_COMPILER_RESULT);
-  // The adapter leaves score/signal null; populate them as a host would.
-  return {
-    ...result,
-    summary: { ...result.summary, score: 64, maturitySignal: "fair" },
-  };
+  return mapCompilerResult(SAMPLE_COMPILER_RESULT);
 }

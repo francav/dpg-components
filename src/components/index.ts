@@ -17,6 +17,7 @@ import { DpgGovernanceMatrix } from "./matrix.js";
 import { DpgFindingsPanel } from "./findings.js";
 import { DpgElementProvenance } from "./provenance.js";
 import { DpgProfilePolicySelector } from "./selectors.js";
+import { DpgGovernanceInspector } from "./inspector.js";
 
 export { DpgElement } from "./base.js";
 export { DpgDeterminismBadge } from "./badge.js";
@@ -26,10 +27,17 @@ export { DpgFindingsPanel } from "./findings.js";
 export { DpgElementProvenance } from "./provenance.js";
 export { DpgProfilePolicySelector } from "./selectors.js";
 export type { SelectorOption, SelectionChangeDetail } from "./selectors.js";
+export { DpgGovernanceInspector } from "./inspector.js";
+export type { InspectorModeDetail } from "./inspector.js";
 export * from "./presentation.js";
 
 export { mountGovernancePanels, FLAT_PANEL_TAGS } from "./mount.js";
-export type { GovernancePanelOptions, GovernancePanelsHandle, FlatPanelTag } from "./mount.js";
+export type {
+  GovernancePanelOptions,
+  GovernancePanelsHandle,
+  FlatPanelTag,
+  GovernancePanelLayout,
+} from "./mount.js";
 
 /** The custom elements and their tag names, in registration order. */
 export const DPG_ELEMENTS = [
@@ -38,6 +46,7 @@ export const DPG_ELEMENTS = [
   DpgFindingsPanel,
   DpgElementProvenance,
   DpgProfilePolicySelector,
+  DpgGovernanceInspector,
 ] as const;
 
 /**

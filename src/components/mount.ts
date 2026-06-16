@@ -3,33 +3,37 @@
 
 /**
  * {@link mountGovernancePanels} — the one shared way to mount the L3 governance
- * panels into a host container.
+ * UI into a host container.
  *
  * Every integration (modeler, starter, Camunda plugin) used to hand-roll the
- * same loop: register the elements, `createElement` one panel per tag, append
- * them, set `.result` on each, and inject the adapter's overlay stylesheet once.
- * This helper owns that loop in one place so the integrations stay thin and
- * never drift apart.
+ * same loop: register the elements, `createElement` the panels, append them,
+ * set `.result` on each, and inject the adapter's overlay stylesheet once. This
+ * helper owns that loop in one place so the integrations stay thin and never
+ * drift apart.
  *
  * It is deliberately framework- and adapter-neutral:
  *  - `@francav/components` keeps NO dependency on `@francav/bpmn-js-adapter`.
  *    The adapter owns its overlay CSS, so the host passes it in as a string
  *    (`stylesheet`) and the helper injects it once, keyed by a stable id.
- *  - Canvas selection is wired via callbacks: the panels emit bubbling, composed
- *    `dpg-element-select` / `dpg-profile-change` / `dpg-policy-change` events;
- *    the helper attaches ONE delegated listener on the container and routes each
- *    to the matching callback. Hosts drive the canvas from those callbacks.
+ *  - Canvas selection is wired via callbacks: the elements emit bubbling,
+ *    composed `dpg-element-select` / `dpg-profile-change` / `dpg-policy-change`
+ *    events; the helper attaches ONE delegated listener on the container and
+ *    routes each to the matching callback. Hosts drive the canvas from those.
  *
- * F.3b ships `layout: "flat"` — the determinism badge, governance matrix, and
- * findings panel, in display order. The consolidated `dpg-governance-inspector`
- * (`layout: "inspector"`) and the real `setSelectedElement` drill-down arrive in
- * F.3c; the API is defined now so hosts can adopt it without churn.
+ * Two layouts:
+ *  - `"inspector"` (the DEFAULT): a single `<dpg-governance-inspector>` giving the
+ *    consolidated process-overview ↔ element drill-down UX. `setSelectedElement`
+ *    drives the inspector's drill-down.
+ *  - `"flat"` (back-compat): the determinism badge, governance matrix, and
+ *    findings panel, in display order. `setSelectedElement` is a no-op (the flat
+ *    set has no element drill-down).
  */
 
 import type { AnalysisResult } from "../view-model/types.js";
 import { defineDpgElements } from "./index.js";
+import type { DpgGovernanceInspector } from "./inspector.js";
 import type { ElementSelectDetail } from "./matrix.js";
-import type { SelectionChangeDetail } from "./selectors.js";
+import type { SelectorOption, SelectionChangeDetail } from "./selectors.js";
 
 /** The flat-layout panel tags, in display order. */
 export const FLAT_PANEL_TAGS = [
@@ -40,21 +44,25 @@ export const FLAT_PANEL_TAGS = [
 
 export type FlatPanelTag = (typeof FLAT_PANEL_TAGS)[number];
 
+/** The consolidated inspector tag (the `"inspector"` layout). */
+export const INSPECTOR_TAG = "dpg-governance-inspector";
+
+export type GovernancePanelLayout = "inspector" | "flat";
+
 /** Stable id for the injected stylesheet `<style>` node (de-dupes mounts). */
 const STYLE_ELEMENT_ID = "dpg-governance-panels-style";
 
-/** The events the helper delegates from the panels to the host callbacks. */
+/** The events the helper delegates from the elements to the host callbacks. */
 const ELEMENT_SELECT_EVENT = "dpg-element-select";
 const PROFILE_CHANGE_EVENT = "dpg-profile-change";
 const POLICY_CHANGE_EVENT = "dpg-policy-change";
 
 export interface GovernancePanelOptions {
   /**
-   * Which panel set to mount. F.3b ships `"flat"` (badge + matrix + findings);
-   * `"inspector"` (the consolidated `dpg-governance-inspector`) arrives in F.3c.
-   * Defaults to `"flat"`.
+   * Which UI to mount. `"inspector"` (the consolidated container) is the DEFAULT;
+   * `"flat"` keeps the badge + matrix + findings trio for back-compat.
    */
-  layout?: "flat";
+  layout?: GovernancePanelLayout;
   /**
    * CSS text the host injects once into the container's root document, keyed by
    * a stable id so repeated mounts never duplicate it. The adapter owns its
@@ -62,39 +70,46 @@ export interface GovernancePanelOptions {
    * keeps NO dependency on `@francav/bpmn-js-adapter`. Omit to inject nothing.
    */
   stylesheet?: string;
+  /** Runtime-profile options for the inspector's profile/policy selector. */
+  profiles?: SelectorOption[];
+  /** Policy-pack options for the inspector's profile/policy selector. */
+  policies?: SelectorOption[];
+  /** The initially selected runtime profile id. */
+  selectedProfile?: string | null;
+  /** The initially selected policy id. */
+  selectedPolicy?: string | null;
   /**
-   * Called when a panel emits `dpg-element-select` (matrix dot / element-bound
-   * finding click). The host typically focuses the element on the canvas.
+   * Called when an element is selected (matrix dot / element-bound finding
+   * click). The host typically focuses the element on the canvas.
    */
   onElementSelect?: (elementId: string) => void;
-  /**
-   * Called when the (future inspector) profile selector changes. Defined now;
-   * unused in the flat layout, which has no selector. Ready for F.3c.
-   */
+  /** Called when the inspector's profile selector changes. */
   onProfileChange?: (id: string) => void;
-  /** Called when the (future inspector) policy selector changes. See above. */
+  /** Called when the inspector's policy selector changes. */
   onPolicyChange?: (id: string) => void;
 }
 
 export interface GovernancePanelsHandle {
-  /** The host container the panels were mounted into. */
+  /** The host container the UI was mounted into. */
   readonly container: HTMLElement;
-  /** Re-render every panel with a new analysis result. */
+  /** The layout that was mounted. */
+  readonly layout: GovernancePanelLayout;
+  /** Re-render the UI with a new analysis result. */
   update(result: AnalysisResult): void;
   /**
-   * Drive the canvas→panel direction: tell the panels which element is selected
-   * on the canvas. A no-op for the flat layout (no element drill-down yet); it
-   * drives the inspector in F.3c.
+   * Drive the canvas→panel direction: tell the UI which element is selected on
+   * the canvas. In the inspector layout this flips it into element drill-down
+   * (or back to overview when `null`); a no-op for the flat layout.
    */
   setSelectedElement(elementId: string | null): void;
-  /** Remove the panel nodes, the injected stylesheet, and the delegated listener. */
+  /** Remove the mounted nodes, the injected stylesheet, and the delegated listener. */
   destroy(): void;
 }
 
 /**
- * Register the L3 elements (once), inject the host stylesheet (once), create the
- * flat panel set under `container`, wire one delegated event listener, and
- * return a handle to update/select/destroy.
+ * Register the L3 elements (once), inject the host stylesheet (once), mount the
+ * chosen layout under `container`, wire one delegated event listener, and return
+ * a handle to update/select/destroy.
  */
 export function mountGovernancePanels(
   container: HTMLElement,
@@ -102,24 +117,18 @@ export function mountGovernancePanels(
 ): GovernancePanelsHandle {
   defineDpgElements();
 
+  const layout: GovernancePanelLayout = options.layout ?? "inspector";
   const ownerDoc = container.ownerDocument;
   const styleHost = injectStylesheet(ownerDoc, options.stylesheet);
 
-  const elements = FLAT_PANEL_TAGS.map((tag): [FlatPanelTag, HTMLElement] => {
-    const el = ownerDoc.createElement(tag);
-    container.appendChild(el);
-    return [tag, el];
-  });
-
-  const applyResult = (result: AnalysisResult): void => {
-    for (const [, el] of elements) {
-      (el as HTMLElement & { result?: AnalysisResult }).result = result;
-    }
-  };
+  // Build the layout's nodes and an `applyResult` that paints them.
+  const mounted =
+    layout === "inspector"
+      ? mountInspector(ownerDoc, container, options)
+      : mountFlat(ownerDoc, container);
 
   // One delegated listener on the container catches the bubbling, composed
-  // events from any panel and routes them to the host callbacks. The panels are
-  // the only emitters, so there are no double-listeners.
+  // events from the mounted elements and routes them to the host callbacks.
   const onContainerEvent = (event: Event): void => {
     switch (event.type) {
       case ELEMENT_SELECT_EVENT: {
@@ -145,16 +154,67 @@ export function mountGovernancePanels(
 
   return {
     container,
-    update: applyResult,
-    setSelectedElement: (_elementId: string | null): void => {
-      // No-op for the flat layout; drives the inspector drill-down in F.3c.
-    },
+    layout,
+    update: mounted.applyResult,
+    setSelectedElement: mounted.setSelectedElement,
     destroy: (): void => {
       container.removeEventListener(ELEMENT_SELECT_EVENT, onContainerEvent);
       container.removeEventListener(PROFILE_CHANGE_EVENT, onContainerEvent);
       container.removeEventListener(POLICY_CHANGE_EVENT, onContainerEvent);
-      for (const [, el] of elements) el.remove();
+      mounted.remove();
       styleHost?.getElementById(STYLE_ELEMENT_ID)?.remove();
+    },
+  };
+}
+
+interface MountedLayout {
+  applyResult(result: AnalysisResult): void;
+  setSelectedElement(elementId: string | null): void;
+  remove(): void;
+}
+
+/** Mount the single consolidated inspector and wire profile/policy + selection. */
+function mountInspector(
+  doc: Document,
+  container: HTMLElement,
+  options: GovernancePanelOptions,
+): MountedLayout {
+  const inspector = doc.createElement(INSPECTOR_TAG) as DpgGovernanceInspector;
+  if (options.profiles) inspector.profiles = options.profiles;
+  if (options.policies) inspector.policies = options.policies;
+  if (options.selectedProfile !== undefined) inspector.selectedProfile = options.selectedProfile;
+  if (options.selectedPolicy !== undefined) inspector.selectedPolicy = options.selectedPolicy;
+  container.appendChild(inspector);
+
+  return {
+    applyResult: (result: AnalysisResult): void => {
+      inspector.result = result;
+      if (options.profiles) inspector.profiles = options.profiles;
+      if (options.policies) inspector.policies = options.policies;
+    },
+    setSelectedElement: (elementId: string | null): void => {
+      inspector.selectedElementId = elementId;
+    },
+    remove: (): void => inspector.remove(),
+  };
+}
+
+/** Mount the flat badge + matrix + findings trio (back-compat). */
+function mountFlat(doc: Document, container: HTMLElement): MountedLayout {
+  const elements = FLAT_PANEL_TAGS.map((tag): HTMLElement => {
+    const el = doc.createElement(tag);
+    container.appendChild(el);
+    return el;
+  });
+  return {
+    applyResult: (result: AnalysisResult): void => {
+      for (const el of elements) (el as HTMLElement & { result?: AnalysisResult }).result = result;
+    },
+    setSelectedElement: (): void => {
+      // No element drill-down in the flat layout.
+    },
+    remove: (): void => {
+      for (const el of elements) el.remove();
     },
   };
 }

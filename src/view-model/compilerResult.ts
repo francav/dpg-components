@@ -54,10 +54,28 @@ export interface CompilerRuntimeDependencyEntryInput {
   readonly profileCoverage: "documented" | "undocumented" | "missingProfile";
 }
 
+/**
+ * The compiler's maturity signal: a distribution of evaluation points across the
+ * determinism/portability quadrants, expressed as percentages (0–100). The
+ * adapter derives the view-model's `score` and `maturitySignal` band from these
+ * real values when present. Only the fields the adapter reads are modeled here;
+ * all optional so an absent signal degrades gracefully to the matrix-derived
+ * fallback.
+ */
+export interface CompilerMaturitySignalInput {
+  /** % of evaluation points that are deterministic or policy-dependent. */
+  readonly deterministicTotal?: number;
+  /** % of evaluation points that are engine-agnostic or profile-scoped. */
+  readonly portableTotal?: number;
+  readonly totalEvaluationPoints?: number;
+}
+
 export interface CompilerResultSummaryInput {
   readonly structuralErrors: number;
   readonly semanticErrors: number;
   readonly contractCoverageRatio: number;
+  /** Optional maturity distribution; the adapter maps it through when present. */
+  readonly maturitySignal?: CompilerMaturitySignalInput;
 }
 
 export interface CompilerResultMetadataInput {

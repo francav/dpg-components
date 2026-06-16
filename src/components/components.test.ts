@@ -10,6 +10,7 @@ import {
   DpgDeterminismBadge,
   DpgElementProvenance,
   DpgFindingsPanel,
+  DpgGovernanceInspector,
   DpgGovernanceMatrix,
   DpgProfilePolicySelector,
   FLAT_PANEL_TAGS,
@@ -167,7 +168,7 @@ describe("mountGovernancePanels (flat layout)", () => {
   function mountFresh(options?: Parameters<typeof mountGovernancePanels>[1]) {
     const container = document.createElement("div");
     document.body.append(container);
-    return { container, handle: mountGovernancePanels(container, options) };
+    return { container, handle: mountGovernancePanels(container, { layout: "flat", ...options }) };
   }
 
   it("mounts the flat panel set into the container", () => {
@@ -278,5 +279,193 @@ describe("mountGovernancePanels (flat layout)", () => {
       }),
     );
     expect(selected).toBeNull();
+  });
+});
+
+describe("<dpg-governance-inspector>", () => {
+  function mountInspector(): DpgGovernanceInspector {
+    const el = document.createElement(DpgGovernanceInspector.tagName) as DpgGovernanceInspector;
+    document.body.append(el);
+    el.result = sampleAnalysis();
+    return el;
+  }
+
+  it("process-overview renders badge, matrix, findings, and recommendations", () => {
+    const el = mountInspector();
+    const sr = el.shadowRoot!;
+
+    // Header badge with the real score/maturity flowing through the adapter.
+    expect(sr.querySelector("dpg-determinism-badge")).toBeTruthy();
+    expect(sr.querySelector("dpg-determinism-badge")?.shadowRoot?.textContent).toContain("64/100");
+    // Summary counts + contract coverage.
+    expect(sr.textContent).toContain("contract coverage");
+    // Matrix is collapsed behind a disclosure pull-tab; open it.
+    const tab = sr.querySelector<HTMLButtonElement>(".disclosure__tab");
+    expect(sr.querySelector("dpg-governance-matrix")).toBeNull();
+    tab?.click();
+    expect(el.shadowRoot?.querySelector("dpg-governance-matrix")).toBeTruthy();
+    // Findings panel + recommendations.
+    expect(el.shadowRoot?.querySelector("dpg-findings-panel")).toBeTruthy();
+    expect(el.shadowRoot?.textContent).toContain("Recommendations");
+    el.remove();
+  });
+
+  it("renders the profile/policy selector when profiles/policies are provided", () => {
+    const el = document.createElement(DpgGovernanceInspector.tagName) as DpgGovernanceInspector;
+    document.body.append(el);
+    el.profiles = [{ id: "camunda-7", label: "Camunda 7" }];
+    el.policies = [{ id: "baseline-tier-2", label: "Baseline Tier 2" }];
+    el.result = sampleAnalysis();
+    expect(el.shadowRoot?.querySelector("dpg-profile-policy-selector")).toBeTruthy();
+    el.remove();
+  });
+
+  it("honors the severity filter on the overview findings panel", () => {
+    const el = mountInspector();
+    // All three severities present unfiltered.
+    let findings = el.shadowRoot
+      ?.querySelector("dpg-findings-panel")
+      ?.shadowRoot?.querySelectorAll(".finding");
+    expect(findings?.length).toBe(3);
+
+    // Click the "Error" severity toggle → only the one error remains.
+    const buttons = Array.from(
+      el.shadowRoot?.querySelectorAll<HTMLButtonElement>(".sevfilter__btn") ?? [],
+    );
+    const errorBtn = buttons.find((b) => b.textContent?.startsWith("Error"));
+    errorBtn?.click();
+    findings = el.shadowRoot
+      ?.querySelector("dpg-findings-panel")
+      ?.shadowRoot?.querySelectorAll(".finding");
+    expect(findings?.length).toBe(1);
+    el.remove();
+  });
+
+  it("flips to element drill-down on dpg-element-select AND re-dispatches upward", () => {
+    const el = mountInspector();
+    el.shadowRoot?.querySelector(".disclosure__tab")?.dispatchEvent(new MouseEvent("click"));
+
+    let reemitted: string | null = null;
+    el.addEventListener("dpg-element-select", (e) => {
+      reemitted = (e as CustomEvent<ElementSelectDetail>).detail.elementId;
+    });
+
+    // A matrix dot is now in the DOM; click it.
+    const dot = el.shadowRoot
+      ?.querySelector("dpg-governance-matrix")
+      ?.shadowRoot?.querySelector<HTMLButtonElement>(".matrix__dot");
+    dot?.click();
+
+    // Inspector flipped into drill-down for that element …
+    expect(el.selectedElementId).toBe(dot?.getAttribute("data-element-id"));
+    expect(el.getAttribute("selected-element-id")).toBe(dot?.getAttribute("data-element-id"));
+    // … shows the provenance card …
+    expect(el.shadowRoot?.querySelector("dpg-element-provenance")).toBeTruthy();
+    // … and re-dispatched the event upward (host still drives the canvas).
+    expect(reemitted).toBe(dot?.getAttribute("data-element-id"));
+    el.remove();
+  });
+
+  it("shows provenance for the selected element and the back control returns to overview", () => {
+    const el = mountInspector();
+    el.selectedElementId = "ServiceTask_Score";
+
+    const provenance = el.shadowRoot?.querySelector("dpg-element-provenance");
+    expect(provenance?.getAttribute("element-id")).toBe("ServiceTask_Score");
+    expect(provenance?.shadowRoot?.textContent).toContain("External-Coupled");
+
+    // Back control clears the selection and returns to the overview.
+    el.shadowRoot?.querySelector<HTMLButtonElement>(".back")?.click();
+    expect(el.selectedElementId).toBeNull();
+    expect(el.shadowRoot?.querySelector("dpg-element-provenance")).toBeNull();
+    expect(el.shadowRoot?.querySelector("dpg-determinism-badge")).toBeTruthy();
+    el.remove();
+  });
+
+  it("re-dispatches profile/policy changes upward", () => {
+    const el = document.createElement(DpgGovernanceInspector.tagName) as DpgGovernanceInspector;
+    document.body.append(el);
+    el.profiles = [
+      { id: "camunda-7", label: "Camunda 7" },
+      { id: "camunda-8", label: "Camunda 8" },
+    ];
+    el.policies = [{ id: "baseline-tier-2", label: "Baseline Tier 2" }];
+    el.result = sampleAnalysis();
+
+    let profile: string | null = null;
+    el.addEventListener("dpg-profile-change", (e) => {
+      profile = (e as CustomEvent<SelectionChangeDetail>).detail.id;
+    });
+    const profileSelect = el.shadowRoot
+      ?.querySelector("dpg-profile-policy-selector")
+      ?.shadowRoot?.querySelector<HTMLSelectElement>("select");
+    profileSelect!.value = "camunda-8";
+    profileSelect!.dispatchEvent(new Event("change"));
+    expect(profile).toBe("camunda-8");
+    el.remove();
+  });
+});
+
+describe("mountGovernancePanels (inspector layout, default)", () => {
+  function mountFresh(options?: Parameters<typeof mountGovernancePanels>[1]) {
+    const container = document.createElement("div");
+    document.body.append(container);
+    return { container, handle: mountGovernancePanels(container, options) };
+  }
+
+  it("defaults to the inspector layout (one container element)", () => {
+    const { container, handle } = mountFresh();
+    expect(handle.layout).toBe("inspector");
+    expect(container.querySelector("dpg-governance-inspector")).toBeTruthy();
+    // The flat trio is NOT mounted at the container level.
+    for (const tag of FLAT_PANEL_TAGS) {
+      expect(container.querySelector(`:scope > ${tag}`)).toBeNull();
+    }
+  });
+
+  it("update() drives the inspector and forwards profiles/policies", () => {
+    const { container, handle } = mountFresh({
+      profiles: [{ id: "camunda-7", label: "Camunda 7" }],
+      policies: [{ id: "baseline-tier-2", label: "Baseline Tier 2" }],
+    });
+    handle.update(sampleAnalysis());
+    const inspector = container.querySelector("dpg-governance-inspector") as DpgGovernanceInspector;
+    expect(inspector.result).not.toBeNull();
+    expect(inspector.shadowRoot?.querySelector("dpg-profile-policy-selector")).toBeTruthy();
+  });
+
+  it("setSelectedElement drives the inspector drill-down (canvas→panel)", () => {
+    const { container, handle } = mountFresh();
+    handle.update(sampleAnalysis());
+    handle.setSelectedElement("ServiceTask_Score");
+
+    const inspector = container.querySelector("dpg-governance-inspector") as DpgGovernanceInspector;
+    expect(inspector.selectedElementId).toBe("ServiceTask_Score");
+    expect(inspector.shadowRoot?.querySelector("dpg-element-provenance")).toBeTruthy();
+
+    handle.setSelectedElement(null);
+    expect(inspector.selectedElementId).toBeNull();
+  });
+
+  it("routes the inspector's re-dispatched dpg-element-select to onElementSelect", () => {
+    let selected: string | null = null;
+    const { handle } = mountFresh({ onElementSelect: (id) => (selected = id) });
+    handle.update(sampleAnalysis());
+    // Drive a selection through the inspector; it re-dispatches upward, the
+    // helper's delegated listener routes it to the host callback.
+    handle.setSelectedElement("Gateway_Approval");
+    // setSelectedElement does not itself emit; simulate a child select instead.
+    const inspector = handle.container.querySelector(
+      "dpg-governance-inspector",
+    ) as DpgGovernanceInspector;
+    inspector.shadowRoot?.dispatchEvent(
+      new CustomEvent<ElementSelectDetail>("dpg-element-select", {
+        detail: { elementId: "ServiceTask_Score" },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    expect(selected).toBe("ServiceTask_Score");
+    handle.destroy();
   });
 });

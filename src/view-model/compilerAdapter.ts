@@ -9,22 +9,26 @@
  * structural {@link CompilerResultInput} boundary instead).
  */
 
-import { ANALYSIS_FLAGS } from "./constants.js";
+import { AXIS_X_INFO, AXIS_Y_INFO } from "../components/presentation.js";
+import { ANALYSIS_FLAGS, scoreToMaturitySignal } from "./constants.js";
 import type {
   CompilerAxisX,
   CompilerAxisY,
   CompilerFindingInput,
+  CompilerMaturitySignalInput,
   CompilerResultInput,
 } from "./compilerResult.js";
 import type {
   AnalysisResult,
-  AxisXClassification,
   AxisXCounts,
-  AxisYClassification,
+  AxisXClassification,
   AxisYCounts,
+  AxisYClassification,
   DeterminismEntry,
   DiagramElementIndex,
   Finding,
+  MaturitySignal,
+  RecommendationCard,
   RuntimeDependencyEntry,
 } from "./types.js";
 
@@ -122,6 +126,67 @@ function buildElementIdResolver(diagram?: DiagramElementIndex): ElementIdResolve
   };
 }
 
+// ── Score / maturity derivation ───────────────────────────────────────────────
+
+function clampScore(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+/**
+ * Resolve the process-level governance score (0–100).
+ *
+ * Prefers the compiler's real `summary.maturitySignal`: its `deterministicTotal`
+ * and `portableTotal` are already percentages, so the score is a 60/40 blend of
+ * determinism and portability — no fabrication. Only when the compiler provides
+ * no usable signal does it fall back to averaging the mapped matrix entries via
+ * the existing AXIS_* score weights. Returns `null` when neither is available
+ * (the badge renders "N/A" gracefully).
+ */
+function deriveScore(
+  signal: CompilerMaturitySignalInput | undefined,
+  determinismMap: Record<string, DeterminismEntry>,
+): number | null {
+  if (
+    signal &&
+    typeof signal.deterministicTotal === "number" &&
+    typeof signal.portableTotal === "number"
+  ) {
+    return clampScore(signal.deterministicTotal * 0.6 + signal.portableTotal * 0.4);
+  }
+
+  const entries = Object.values(determinismMap);
+  if (entries.length === 0) return null;
+  const sum = entries.reduce(
+    (acc, e) => acc + AXIS_Y_INFO[e.axisY].score * 0.6 + AXIS_X_INFO[e.axisX].score * 0.4,
+    0,
+  );
+  return clampScore(sum / entries.length);
+}
+
+const RECOMMENDATION_SEVERITY: Record<Finding["severity"], RecommendationCard["severity"]> = {
+  error: "high",
+  warning: "medium",
+  info: "low",
+};
+
+const FINDING_RANK: Record<Finding["severity"], number> = { error: 0, warning: 1, info: 2 };
+
+/**
+ * Derive recommendation cards from the worst findings (errors first), preferring
+ * each finding's own remediation text. Used only when the compiler carries no
+ * recommendations of its own.
+ */
+function deriveRecommendations(findings: Finding[]): RecommendationCard[] {
+  return [...findings]
+    .sort((a, b) => FINDING_RANK[a.severity] - FINDING_RANK[b.severity])
+    .slice(0, 5)
+    .map((f) => ({
+      id: `rec-${f.id}`,
+      severity: RECOMMENDATION_SEVERITY[f.severity],
+      message: f.recommendation || f.message,
+    }));
+}
+
 // ── Public mapper ─────────────────────────────────────────────────────────────
 
 /**
@@ -205,14 +270,19 @@ export function mapCompilerResult(
   if (cr.metadata.degraded) degradedFlags.push(ANALYSIS_FLAGS.policyDefault);
   if (axisY.runtimeBound > 0) degradedFlags.push(ANALYSIS_FLAGS.runtimeBound);
 
+  // Prefer the compiler's real maturity signal; bucket the score into a band.
+  const score = deriveScore(cr.summary.maturitySignal, determinismMap);
+  const maturitySignal: MaturitySignal | null =
+    score === null ? null : scoreToMaturitySignal(score);
+
   return {
     process: {
       id: cr.metadata.modelId,
       name: cr.metadata.modelId,
     },
     summary: {
-      maturitySignal: null,
-      score: null,
+      maturitySignal,
+      score,
       structuralFindings: cr.summary.structuralErrors,
       semanticFindings: cr.summary.semanticErrors,
       contractCoverageRatio: cr.summary.contractCoverageRatio,
@@ -222,6 +292,6 @@ export function mapCompilerResult(
     findings: allFindings,
     determinismMap,
     runtimeDependencyMap,
-    recommendations: [],
+    recommendations: deriveRecommendations(allFindings),
   };
 }

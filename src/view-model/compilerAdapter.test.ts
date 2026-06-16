@@ -40,8 +40,78 @@ describe("mapCompilerResult", () => {
     expect(result.summary.structuralFindings).toBe(2);
     expect(result.summary.semanticFindings).toBe(3);
     expect(result.summary.contractCoverageRatio).toBe(0.5);
+    // No maturity signal AND no evaluated elements → score/signal stay null
+    // (the badge renders "N/A" gracefully).
     expect(result.summary.maturitySignal).toBeNull();
     expect(result.summary.score).toBeNull();
+  });
+
+  it("maps the compiler's real maturity signal through to score + band", () => {
+    const result = mapCompilerResult(
+      baseResult({
+        summary: {
+          structuralErrors: 0,
+          semanticErrors: 0,
+          contractCoverageRatio: 1,
+          // 60/40 blend: 90*0.6 + 80*0.4 = 86 → "excellent".
+          maturitySignal: { deterministicTotal: 90, portableTotal: 80 },
+        },
+      }),
+    );
+    expect(result.summary.score).toBe(86);
+    expect(result.summary.maturitySignal).toBe("excellent");
+  });
+
+  it("derives a fallback score from the matrix when the compiler has no signal", () => {
+    const result = mapCompilerResult(
+      baseResult({
+        determinismMap: [
+          // fullyDeterministic + selfContained → 100*0.6 + 100*0.4 = 100.
+          {
+            evaluationPointId: "A",
+            axisY: "deterministic",
+            axisX: "engineAgnostic",
+            policyClause: "p",
+          },
+        ],
+      }),
+    );
+    expect(result.summary.score).toBe(100);
+    expect(result.summary.maturitySignal).toBe("excellent");
+  });
+
+  it("populates recommendations from the worst findings, errors first", () => {
+    const result = mapCompilerResult(
+      baseResult({
+        structuralFindings: [
+          {
+            id: "S",
+            category: "structural",
+            severity: "error",
+            message: "missing impl",
+            ruleId: "STRUCT_001",
+            remediation: "bind an implementation",
+          },
+        ],
+        semanticFindings: [
+          {
+            id: "M",
+            category: "semantic",
+            severity: "info",
+            message: "note",
+            ruleId: "SEM_001",
+          },
+        ],
+      }),
+    );
+    expect(result.recommendations).toHaveLength(2);
+    // Error first; prefers the remediation text; severity → card severity.
+    expect(result.recommendations[0]).toMatchObject({
+      severity: "high",
+      message: "bind an implementation",
+    });
+    // Info finding without remediation falls back to its message.
+    expect(result.recommendations[1]).toMatchObject({ severity: "low", message: "note" });
   });
 
   it("merges structural and semantic findings with unique, prefixed ids", () => {
