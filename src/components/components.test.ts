@@ -12,6 +12,8 @@ import {
   DpgFindingsPanel,
   DpgGovernanceMatrix,
   DpgProfilePolicySelector,
+  FLAT_PANEL_TAGS,
+  mountGovernancePanels,
 } from "./index.js";
 import type { ElementSelectDetail, SelectionChangeDetail } from "./index.js";
 import { sampleAnalysis } from "./test-fixtures.js";
@@ -158,5 +160,123 @@ describe("<dpg-profile-policy-selector>", () => {
     profileSelect.dispatchEvent(new Event("change"));
     expect(changedProfile).toBe("camunda-8");
     el.remove();
+  });
+});
+
+describe("mountGovernancePanels (flat layout)", () => {
+  function mountFresh(options?: Parameters<typeof mountGovernancePanels>[1]) {
+    const container = document.createElement("div");
+    document.body.append(container);
+    return { container, handle: mountGovernancePanels(container, options) };
+  }
+
+  it("mounts the flat panel set into the container", () => {
+    const { container } = mountFresh();
+    for (const tag of FLAT_PANEL_TAGS) {
+      expect(container.querySelector(tag)).toBeTruthy();
+    }
+    // Flat layout drops the standalone selector (it returns inside the inspector).
+    expect(container.querySelector("dpg-profile-policy-selector")).toBeNull();
+  });
+
+  it("update() propagates the result to every panel", () => {
+    const { container, handle } = mountFresh();
+    const result = sampleAnalysis();
+    handle.update(result);
+
+    for (const tag of FLAT_PANEL_TAGS) {
+      const el = container.querySelector(tag) as HTMLElement & { result?: unknown };
+      expect(el.result).toBe(result);
+    }
+    // Re-rendered content reflects the result.
+    expect(container.querySelector("dpg-governance-matrix")?.shadowRoot?.textContent).toContain(
+      "3 elements",
+    );
+  });
+
+  it("routes a child dpg-element-select to onElementSelect", () => {
+    let selected: string | null = null;
+    const { container, handle } = mountFresh({ onElementSelect: (id) => (selected = id) });
+    handle.update(sampleAnalysis());
+
+    const matrix = container.querySelector("dpg-governance-matrix")!;
+    matrix.dispatchEvent(
+      new CustomEvent<ElementSelectDetail>("dpg-element-select", {
+        detail: { elementId: "ServiceTask_Score" },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    expect(selected).toBe("ServiceTask_Score");
+  });
+
+  it("routes dpg-profile-change / dpg-policy-change to their callbacks", () => {
+    let profile: string | null = null;
+    let policy: string | null = null;
+    const { container } = mountFresh({
+      onProfileChange: (id) => (profile = id),
+      onPolicyChange: (id) => (policy = id),
+    });
+    const matrix = container.querySelector("dpg-governance-matrix")!;
+    matrix.dispatchEvent(
+      new CustomEvent<SelectionChangeDetail>("dpg-profile-change", {
+        detail: { id: "camunda-8" },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    matrix.dispatchEvent(
+      new CustomEvent<SelectionChangeDetail>("dpg-policy-change", {
+        detail: { id: "baseline-tier-1" },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    expect(profile).toBe("camunda-8");
+    expect(policy).toBe("baseline-tier-1");
+  });
+
+  it("setSelectedElement is a no-op stub for the flat layout", () => {
+    const { handle } = mountFresh();
+    expect(() => handle.setSelectedElement("ServiceTask_Score")).not.toThrow();
+    expect(() => handle.setSelectedElement(null)).not.toThrow();
+  });
+
+  it("injects the passed stylesheet once (de-duped across mounts) and removes it on destroy", () => {
+    const css = ".dpg-test-marker { color: red; }";
+    const { handle } = mountFresh({ stylesheet: css });
+    // A second mount with the same CSS must not duplicate the keyed style node.
+    const { handle: handle2 } = mountFresh({ stylesheet: css });
+
+    const styles = document.querySelectorAll("#dpg-governance-panels-style");
+    expect(styles.length).toBe(1);
+    expect(styles[0]?.textContent).toBe(css);
+
+    handle.destroy();
+    handle2.destroy();
+    expect(document.getElementById("dpg-governance-panels-style")).toBeNull();
+  });
+
+  it("injects nothing when no stylesheet is passed", () => {
+    const { handle } = mountFresh();
+    expect(document.getElementById("dpg-governance-panels-style")).toBeNull();
+    handle.destroy();
+  });
+
+  it("destroy() removes the panels and the delegated listener", () => {
+    let selected: string | null = null;
+    const { container, handle } = mountFresh({ onElementSelect: (id) => (selected = id) });
+    handle.destroy();
+
+    expect(container.children.length).toBe(0);
+    // After destroy the delegated listener is gone — no further routing.
+    container.dispatchEvent(
+      new CustomEvent<ElementSelectDetail>("dpg-element-select", {
+        detail: { elementId: "ServiceTask_Score" },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    expect(selected).toBeNull();
   });
 });

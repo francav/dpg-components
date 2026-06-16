@@ -28,6 +28,9 @@ export { DpgProfilePolicySelector } from "./selectors.js";
 export type { SelectorOption, SelectionChangeDetail } from "./selectors.js";
 export * from "./presentation.js";
 
+export { mountGovernancePanels, FLAT_PANEL_TAGS } from "./mount.js";
+export type { GovernancePanelOptions, GovernancePanelsHandle, FlatPanelTag } from "./mount.js";
+
 /** The custom elements and their tag names, in registration order. */
 export const DPG_ELEMENTS = [
   DpgDeterminismBadge,
