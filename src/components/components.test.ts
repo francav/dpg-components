@@ -404,6 +404,168 @@ describe("<dpg-governance-inspector>", () => {
     expect(profile).toBe("camunda-8");
     el.remove();
   });
+
+  // ── WU-F.4 large-process filters ─────────────────────────────────────────
+
+  function findingCount(el: DpgGovernanceInspector): number {
+    return (
+      el.shadowRoot?.querySelector("dpg-findings-panel")?.shadowRoot?.querySelectorAll(".finding")
+        .length ?? 0
+    );
+  }
+  function axisBars(el: DpgGovernanceInspector): HTMLButtonElement[] {
+    return Array.from(el.shadowRoot?.querySelectorAll<HTMLButtonElement>(".axisbar") ?? []);
+  }
+  function severityBtn(el: DpgGovernanceInspector, prefix: string): HTMLButtonElement | undefined {
+    return Array.from(
+      el.shadowRoot?.querySelectorAll<HTMLButtonElement>(".sevfilter__btn") ?? [],
+    ).find((b) => b.textContent?.startsWith(prefix));
+  }
+
+  it("axis-class bars show per-class element counts from result.matrix", () => {
+    const el = mountInspector();
+    // The fixture has one element per Axis-Y class and three of the four Axis-X
+    // classes (selfContained = 0) → 3 Y bars + 4 X bars.
+    const bars = axisBars(el);
+    expect(bars.length).toBe(7);
+    // Each Axis-Y class has exactly one element.
+    const det = bars.find((b) => b.textContent?.includes("Fully Deterministic"));
+    expect(det?.querySelector(".axisbar__count")?.textContent).toBe("1");
+    // selfContained has zero elements.
+    const self = bars.find((b) => b.textContent?.includes("Self-Contained"));
+    expect(self?.querySelector(".axisbar__count")?.textContent).toBe("0");
+    el.remove();
+  });
+
+  it("clicking an axis-class bar filters findings to that class and shows a removable chip", () => {
+    const el = mountInspector();
+    expect(findingCount(el)).toBe(3);
+
+    // Click the runtime-bound (Axis-Y) bar → only Gateway_Approval's warning.
+    axisBars(el)
+      .find((b) => b.textContent?.includes("Runtime-Bound"))!
+      .click();
+    expect(findingCount(el)).toBe(1);
+    const chip = el.shadowRoot?.querySelector(".chip");
+    expect(chip?.textContent).toContain("Runtime-Bound");
+
+    // Removing the chip clears the filter.
+    el.shadowRoot?.querySelector<HTMLButtonElement>(".chip__x")?.click();
+    expect(findingCount(el)).toBe(3);
+    expect(el.shadowRoot?.querySelector(".chip")).toBeNull();
+    el.remove();
+  });
+
+  it("clicking the active axis bar again clears the filter (toggle)", () => {
+    const el = mountInspector();
+    const bar = () => axisBars(el).find((b) => b.textContent?.includes("Engine-Specific"))!;
+    bar().click();
+    expect(findingCount(el)).toBe(1);
+    bar().click();
+    expect(findingCount(el)).toBe(3);
+    el.remove();
+  });
+
+  it("severity badge counts compose with the active axis-class filter", () => {
+    const el = mountInspector();
+    // Unfiltered: 1 error, 1 warning, 1 info.
+    expect(severityBtn(el, "Error")?.textContent).toBe("Error (1)");
+    expect(severityBtn(el, "Warning")?.textContent).toBe("Warning (1)");
+
+    // Filter to externalCoupled (only ServiceTask_Score, an error) → the warning
+    // badge now reads 0, the error badge reads 1, "All" reads 1.
+    axisBars(el)
+      .find((b) => b.textContent?.includes("External-Coupled"))!
+      .click();
+    expect(severityBtn(el, "All")?.textContent).toBe("All (1)");
+    expect(severityBtn(el, "Error")?.textContent).toBe("Error (1)");
+    expect(severityBtn(el, "Warning")?.textContent).toBe("Warning (0)");
+    el.remove();
+  });
+
+  it("composes severity AND axis-class filters on the findings list", () => {
+    const el = mountInspector();
+    // Axis-class = policyDependent (only ServiceTask_Score, an error).
+    axisBars(el)
+      .find((b) => b.textContent?.includes("Policy-Dependent"))!
+      .click();
+    expect(findingCount(el)).toBe(1);
+    // Add severity = warning on top → nothing matches (intersection empty).
+    severityBtn(el, "Warning")?.click();
+    expect(findingCount(el)).toBe(0);
+    // Severity = error → the one error returns.
+    severityBtn(el, "Error")?.click();
+    expect(findingCount(el)).toBe(1);
+    el.remove();
+  });
+
+  it("current-element-only toggle narrows findings and composes with severity", () => {
+    const el = mountInspector();
+    el.selectedElementId = "ServiceTask_Score";
+    // Back to overview (selection persists) so the toggle + findings are visible.
+    el.shadowRoot?.querySelector<HTMLButtonElement>(".back")?.click();
+
+    const toggle = el.shadowRoot?.querySelector<HTMLInputElement>(".toggle input");
+    expect(toggle?.disabled).toBe(false);
+    // Badge shows the selected element's finding count (1).
+    expect(el.shadowRoot?.querySelector(".toggle")?.textContent).toContain("(1)");
+
+    toggle!.checked = true;
+    toggle!.dispatchEvent(new Event("change"));
+    expect(findingCount(el)).toBe(1);
+    const chip = el.shadowRoot?.querySelector(".chip");
+    expect(chip?.textContent).toContain("ServiceTask_Score");
+
+    // Compose with a non-matching severity → empty.
+    severityBtn(el, "Info")?.click();
+    expect(findingCount(el)).toBe(0);
+    el.remove();
+  });
+
+  it("current-element-only toggle is disabled with no selection (default off)", () => {
+    const el = mountInspector();
+    const toggle = el.shadowRoot?.querySelector<HTMLInputElement>(".toggle input");
+    expect(toggle?.disabled).toBe(true);
+    expect(toggle?.checked).toBe(false);
+    // No filters active by default → all three findings, no chips.
+    expect(findingCount(el)).toBe(3);
+    expect(el.shadowRoot?.querySelector(".chip")).toBeNull();
+    el.remove();
+  });
+
+  it("drill-down exposes Analysis | Properties sub-tabs; Properties shows read-only metadata", () => {
+    const el = mountInspector();
+    el.selectedElementId = "ServiceTask_Score";
+
+    const tabs = Array.from(
+      el.shadowRoot?.querySelectorAll<HTMLButtonElement>(".subtabs__tab") ?? [],
+    );
+    expect(tabs.map((t) => t.textContent)).toEqual(["Analysis", "Properties"]);
+    // Defaults to Analysis (the provenance card).
+    expect(el.shadowRoot?.querySelector("dpg-element-provenance")).toBeTruthy();
+    expect(el.shadowRoot?.querySelector(".props")).toBeNull();
+
+    // Switch to Properties → provenance gone, key/value metadata shown.
+    tabs.find((t) => t.textContent === "Properties")!.click();
+    expect(el.shadowRoot?.querySelector("dpg-element-provenance")).toBeNull();
+    const props = el.shadowRoot?.querySelector(".props");
+    expect(props?.textContent).toContain("ServiceTask_Score");
+    expect(props?.textContent).toContain("Policy-Dependent");
+    expect(props?.textContent).toContain("External-Coupled");
+    el.remove();
+  });
+
+  it("re-selecting an element resets the drill-down to the Analysis tab", () => {
+    const el = mountInspector();
+    el.selectedElementId = "ServiceTask_Score";
+    el.shadowRoot?.querySelector<HTMLButtonElement>(".subtabs__tab:nth-child(2)")?.click(); // Properties
+    expect(el.shadowRoot?.querySelector(".props")).toBeTruthy();
+    // A new selection opens on Analysis again.
+    el.selectedElementId = "Gateway_Approval";
+    expect(el.shadowRoot?.querySelector("dpg-element-provenance")).toBeTruthy();
+    expect(el.shadowRoot?.querySelector(".props")).toBeNull();
+    el.remove();
+  });
 });
 
 describe("mountGovernancePanels (inspector layout, default)", () => {
