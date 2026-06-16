@@ -1,6 +1,6 @@
 {
-  "name": "@dpg/components",
-  "version": "0.1.0",
+  "name": "@francav/components",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "main": "dist/index.js",

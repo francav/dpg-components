@@ -4,7 +4,7 @@
 /**
  * Shared test fixture: a realistic compiler result mapped through the real
  * adapter, so the component tests render against the same view-model a consumer
- * would build from `@dpg/compiler-core` output. Not part of the published API.
+ * would build from `@francav/compiler-core` output. Not part of the published API.
  */
 
 import { mapCompilerResult } from "../view-model/compilerAdapter.js";

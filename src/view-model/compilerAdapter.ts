@@ -127,7 +127,7 @@ function buildElementIdResolver(diagram?: DiagramElementIndex): ElementIdResolve
 /**
  * Map a compiler result onto the {@link AnalysisResult} view-model.
  *
- * @param cr      The compiler result (structurally `@dpg/compiler-core`'s
+ * @param cr      The compiler result (structurally `@francav/compiler-core`'s
  *                `CompilerResult`).
  * @param diagram Optional element index. When supplied, evaluation-point ids are
  *                reconciled against the diagram's canonical element ids (and

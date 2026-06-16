@@ -11,8 +11,8 @@
  * the user picks a different one. It does not depend on the analysis result.
  *
  * Mirrors the modeler inspector's profile/policy host, decoupled from React and
- * from any specific profile/policy catalog (those live in @dpg/profiles and
- * @dpg/policies and are passed in).
+ * from any specific profile/policy catalog (those live in @francav/profiles and
+ * @francav/policies and are passed in).
  */
 
 import { clear } from "./dom.js";

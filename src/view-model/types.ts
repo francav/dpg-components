@@ -2,7 +2,7 @@
 // Copyright 2026 Victor França
 
 /**
- * Framework-neutral view-model types for @dpg/components.
+ * Framework-neutral view-model types for @francav/components.
  *
  * These describe the shape the L3 components render. They are deliberately
  * decoupled from any UI framework (no React, no DOM) and from the compiler

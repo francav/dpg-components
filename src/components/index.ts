@@ -2,7 +2,7 @@
 // Copyright 2026 Victor França
 
 /**
- * @dpg/components custom-element layer.
+ * @francav/components custom-element layer.
  *
  * Framework-neutral Web Components that render the WU view-model
  * ({@link AnalysisResult}). Each is a standard custom element: set the `result`

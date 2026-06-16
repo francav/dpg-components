@@ -2,7 +2,7 @@
 // Copyright 2026 Victor França
 
 /**
- * @dpg/components — L3 component layer.
+ * @francav/components — L3 component layer.
  *
  * Exposes two layers:
  *  - the framework-neutral view-model: the adapter that maps compiler output

@@ -1,4 +1,4 @@
-# @dpg/components
+# @francav/components
 
 Framework-agnostic Web Components for **Deterministic Process Governance (DPG)** — they render
 governance analysis (determinism classification, findings, coverage) in any host: React, Angular, or

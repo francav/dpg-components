@@ -4,9 +4,9 @@
 /**
  * Structural description of the compiler result the adapter consumes.
  *
- * @dpg/components stays dependency-free at runtime: rather than importing the
+ * @francav/components stays dependency-free at runtime: rather than importing the
  * compiler package, it declares the slice of the L1 compiler-result boundary it
- * reads. The real `CompilerResult` from `@dpg/compiler-core` is structurally
+ * reads. The real `CompilerResult` from `@francav/compiler-core` is structurally
  * assignable to {@link CompilerResultInput}, so a consumer can pass it directly
  * with no adapter at the call site.
  *
